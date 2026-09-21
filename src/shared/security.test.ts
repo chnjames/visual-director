@@ -221,6 +221,19 @@ describe('Base URL 可修改但限官方域名（SSRF 防护）', () => {
     expect(m?.protocol).toBe('openai');
     expect(m?.baseUrl).toBe(ARK_DEFAULT_BASE_URLS.openai);
   });
+
+  it('旧的 Agent Plan 默认地址加载后改为平台 OpenAI 地址', () => {
+    sessionStorage.setItem(
+      'vrp.modelSettings.v1',
+      JSON.stringify({
+        apiKey: SECRET,
+        seedEndpoint: 'ep-x',
+        protocol: 'openai',
+        baseUrl: 'https://ark.cn-beijing.volces.com/api/plan/v3',
+      }),
+    );
+    expect(loadModelSettings()?.baseUrl).toBe('https://ark.cn-beijing.volces.com/api/v3');
+  });
 });
 
 describe('HTTP 状态分类', () => {

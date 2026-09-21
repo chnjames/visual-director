@@ -198,7 +198,12 @@ async function postToArk(
     return {
       ok: false,
       status: res.status,
-      error: createSafeError('illegal-json', '模型返回了无法解析的响应', baseDiag(), apiKey),
+      error: createSafeError(
+        'illegal-json',
+        `模型返回了无法解析的响应。实际请求 ${targetUrl}（HTTP ${res.status}）`,
+        baseDiag(),
+        apiKey,
+      ),
     };
   }
 
@@ -492,7 +497,12 @@ export async function generateImage(
   try {
     json = await res.json();
   } catch {
-    return createSafeError('illegal-json', '图片接口返回了无法解析的响应', diag(), imageApiKey);
+    return createSafeError(
+      'illegal-json',
+      `图片接口返回了无法解析的响应。实际请求 ${targetUrl}（HTTP ${res.status}）`,
+      diag(),
+      imageApiKey,
+    );
   }
 
   const rows = (json as { data?: Array<{ b64_json?: unknown }> })?.data;

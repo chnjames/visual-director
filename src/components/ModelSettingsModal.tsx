@@ -3,6 +3,8 @@ import {
   ARK_DEFAULT_BASE_URLS,
   ARK_IMAGE_DEFAULT_BASE_URL,
   SEEDREAM_5_MODEL_ID,
+  buildArkImageUrl,
+  buildArkUpstreamUrl,
   type ArkProtocol,
 } from '../shared/constants';
 import {
@@ -299,6 +301,9 @@ export function ModelSettingsModal({ open, initial, onSave, onClear, onClose, em
               data-testid="image-baseurl-input"
             />
             {!imageBaseOk && <span className="hint err">仅允许火山方舟官方 https 域名</span>}
+            {imageBaseOk && (
+              <span className="hint">实际请求 {buildArkImageUrl(imageBaseUrl)}</span>
+            )}
           </label>
           {imageTestMsg && (
             <p className={imageTestOk ? 'okbox' : 'hint err'} data-testid="image-test-result">
@@ -374,6 +379,9 @@ export function ModelSettingsModal({ open, initial, onSave, onClear, onClose, em
               />
               {baseUrl.length > 0 && !baseOk && (
                 <span className="hint err">仅允许火山方舟官方 https 域名</span>
+              )}
+              {baseOk && (
+                <span className="hint">实际请求 {buildArkUpstreamUrl(protocol, baseUrl)}</span>
               )}
             </label>
           </div>

@@ -24,7 +24,7 @@ const DIST_DIR = path.resolve(__dirname, '..', 'dist');
 const PORT = Number(process.env.PORT || 5173);
 
 const DEFAULT_BASE = {
-  openai: 'https://ark.cn-beijing.volces.com/api/plan/v3',
+  openai: 'https://ark.cn-beijing.volces.com/api/v3',
   anthropic: 'https://ark.cn-beijing.volces.com/api/plan',
 };
 const IMAGE_DEFAULT_BASE = 'https://ark.cn-beijing.volces.com/api/v3';

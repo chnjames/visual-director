@@ -59,7 +59,7 @@ describe('模型设置', () => {
         seedEndpoint: 'ep-seed-001',
         imageEndpoint: SEEDREAM_5_MODEL_ID,
         imageBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-        baseUrl: 'https://ark.cn-beijing.volces.com/api/plan/v3',
+        baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
       }),
     );
   });

@@ -23,6 +23,17 @@ function trimmedString(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() : undefined;
 }
 
+const LEGACY_PLAN_OPENAI_BASE = 'https://ark.cn-beijing.volces.com/api/plan/v3';
+
+/** 浏览器不能给 Agent Plan 地址带鉴权头，旧默认值改到平台 OpenAI 地址。 */
+function browserTextBaseUrl(protocol: ArkProtocol, raw: unknown): string {
+  const value = typeof raw === 'string' ? raw.trim().replace(/\/+$/, '') : '';
+  if (!value || (protocol === 'openai' && value === LEGACY_PLAN_OPENAI_BASE)) {
+    return ARK_DEFAULT_BASE_URLS[protocol];
+  }
+  return value;
+}
+
 /** 用协议默认值补齐设置（旧版本只有一把 apiKey 时，同时填入图片/文本通道） */
 function withDefaults(raw: Partial<ModelSettings>): ModelSettings {
   const protocol = normalizeProtocol(raw.protocol);
@@ -40,10 +51,7 @@ function withDefaults(raw: Partial<ModelSettings>): ModelSettings {
         ? raw.imageBaseUrl.trim()
         : ARK_IMAGE_DEFAULT_BASE_URL,
     protocol,
-    baseUrl:
-      typeof raw.baseUrl === 'string' && raw.baseUrl.trim()
-        ? raw.baseUrl.trim()
-        : ARK_DEFAULT_BASE_URLS[protocol],
+    baseUrl: browserTextBaseUrl(protocol, raw.baseUrl),
   };
 }
 

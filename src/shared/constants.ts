@@ -12,7 +12,7 @@ export type ArkProtocol = 'openai' | 'anthropic';
  * - Anthropic 兼容：{base}/v1/messages
  */
 export const ARK_DEFAULT_BASE_URLS: Record<ArkProtocol, string> = {
-  openai: 'https://ark.cn-beijing.volces.com/api/plan/v3',
+  openai: 'https://ark.cn-beijing.volces.com/api/v3',
   anthropic: 'https://ark.cn-beijing.volces.com/api/plan',
 };
 
@@ -52,6 +52,7 @@ export const ARK_IMAGE_TIMEOUT_MS = 180_000;
  */
 export function buildArkImageUrl(openaiBaseUrl: string): string {
   const trimmed = openaiBaseUrl.trim().replace(/\/+$/, '');
+  if (trimmed.endsWith(ARK_IMAGE_PATH)) return trimmed;
   return `${trimmed}${ARK_IMAGE_PATH}`;
 }
 
@@ -80,10 +81,12 @@ export function clampTimeoutMs(value: unknown, fallback: number = ARK_REQUEST_TI
   return Math.min(ARK_MAX_TIMEOUT_MS, Math.max(ARK_MIN_TIMEOUT_MS, Math.round(n)));
 }
 
-/** 依据协议与（可能被用户修改过的）Base URL 拼接最终上游地址 */
+/** 依据协议与（可能被用户修改过的）Base URL 拼接最终上游地址。已带接口路径时不再重复拼接。 */
 export function buildArkUpstreamUrl(protocol: ArkProtocol, baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, '');
-  return `${trimmed}${ARK_API_PATHS[protocol]}`;
+  const path = ARK_API_PATHS[protocol];
+  if (trimmed.endsWith(path)) return trimmed;
+  return `${trimmed}${path}`;
 }
 
 /** 12 个视觉配方字段键（顺序即产品合同，不可增减） */

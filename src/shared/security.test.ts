@@ -9,6 +9,7 @@ import {
   redactSecret,
   describeNetworkFailure,
   localizeUpstreamError,
+  sanitizeApiKey,
   isSecretPersisted,
   isValidEndpoint,
   isValidBaseUrl,
@@ -92,6 +93,11 @@ describe('脱敏', () => {
     const text = describeNetworkFailure(err);
     expect(text).toContain('UND_ERR_CONNECT_TIMEOUT');
     expect(text).toContain('fetch failed');
+  });
+  it('sanitizeApiKey 去掉 Bearer 前缀与引号', () => {
+    expect(sanitizeApiKey('Bearer sk-abc')).toBe('sk-abc');
+    expect(sanitizeApiKey('"sk-abc"')).toBe('sk-abc');
+    expect(sanitizeApiKey("  'sk-abc'  ")).toBe('sk-abc');
   });
   it('localizeUpstreamError 把 401 收成中文，并抽出 Request id', () => {
     const r = localizeUpstreamError(
@@ -222,7 +228,7 @@ describe('Base URL 可修改但限官方域名（SSRF 防护）', () => {
     expect(m?.baseUrl).toBe(ARK_DEFAULT_BASE_URLS.openai);
   });
 
-  it('旧的 Agent Plan 默认地址加载后改为平台 OpenAI 地址', () => {
+  it('显式保存的 Agent Plan Base URL 加载后保持不变', () => {
     sessionStorage.setItem(
       'vrp.modelSettings.v1',
       JSON.stringify({
@@ -232,7 +238,7 @@ describe('Base URL 可修改但限官方域名（SSRF 防护）', () => {
         baseUrl: 'https://ark.cn-beijing.volces.com/api/plan/v3',
       }),
     );
-    expect(loadModelSettings()?.baseUrl).toBe('https://ark.cn-beijing.volces.com/api/v3');
+    expect(loadModelSettings()?.baseUrl).toBe('https://ark.cn-beijing.volces.com/api/plan/v3');
   });
 });
 

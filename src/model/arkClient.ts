@@ -224,10 +224,19 @@ async function postToArk(
   }
 
   const errorClass = classifyHttpStatus(res.status);
-  const error: SafeError = createSafeError(
+  const localized = localizeUpstreamError(
     errorClass,
     redactSecret(upstreamErrorMessage(json, res.status), apiKey),
-    { ...baseDiag(), httpStatus: res.status, errorClass },
+  );
+  const error: SafeError = createSafeError(
+    errorClass,
+    localized.message,
+    {
+      ...baseDiag(),
+      httpStatus: res.status,
+      errorClass,
+      requestId: localized.requestId,
+    },
     apiKey,
   );
   return { ok: false, status: res.status, error };

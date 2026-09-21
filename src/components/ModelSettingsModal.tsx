@@ -11,6 +11,7 @@ import {
   imageApiKeyOf,
   isValidBaseUrl,
   isValidEndpoint,
+  sanitizeApiKey,
   textApiKeyOf,
 } from '../shared/security';
 import type { ModelSettings } from '../shared/types';
@@ -40,8 +41,8 @@ function buildDraft(fields: {
   protocol: ArkProtocol;
   baseUrl: string;
 }): ModelSettings {
-  const imageApiKey = fields.imageApiKey.trim();
-  const textApiKey = fields.textApiKey.trim();
+  const imageApiKey = sanitizeApiKey(fields.imageApiKey);
+  const textApiKey = sanitizeApiKey(fields.textApiKey);
   return {
     apiKey: imageApiKey || textApiKey,
     imageApiKey,
@@ -148,7 +149,12 @@ export function ModelSettingsModal({ open, initial, onSave, onClear, onClose, em
       );
     } else {
       setTestOk(false);
-      setTestMsg(`文本模型连接失败 · ${r.errorClass}：${r.message}`);
+      const requestId = 'diagnostics' in r ? r.diagnostics.requestId : undefined;
+      setTestMsg(
+        `文本模型连接失败 · ${r.errorClass}：${r.message}${
+          requestId ? `（requestId ${requestId}）` : ''
+        }`,
+      );
     }
   }
 
@@ -331,7 +337,7 @@ export function ModelSettingsModal({ open, initial, onSave, onClear, onClose, em
               <input
                 type={showTextKey ? 'text' : 'password'}
                 value={textApiKey}
-                placeholder="可与图片 Key 不同"
+                placeholder="Platform API Key"
                 onChange={(e) => setTextApiKey(e.target.value)}
                 data-testid="text-apikey-input"
                 autoComplete="off"
@@ -340,6 +346,7 @@ export function ModelSettingsModal({ open, initial, onSave, onClear, onClose, em
                 {showTextKey ? '隐藏' : '显示'}
               </button>
             </div>
+            <span className="hint">须与图片相同：用「API Key 管理」的 Platform Key，不是 Agent Plan 订阅密钥</span>
           </label>
           <label className="field">
             <span>Endpoint</span>
@@ -382,6 +389,12 @@ export function ModelSettingsModal({ open, initial, onSave, onClear, onClose, em
               )}
               {baseOk && (
                 <span className="hint">实际请求 {buildArkUpstreamUrl(protocol, baseUrl)}</span>
+              )}
+              {baseOk && /\/api\/plan(?:\/|$)/.test(baseUrl) && (
+                <span className="hint">
+                  Agent Plan 地址在浏览器里可能拦鉴权头；若测试失败，可改用
+                  https://ark.cn-beijing.volces.com/api/v3（需 Platform API Key）
+                </span>
               )}
             </label>
           </div>

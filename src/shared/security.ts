@@ -23,23 +23,24 @@ function trimmedString(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() : undefined;
 }
 
-const LEGACY_PLAN_OPENAI_BASE = 'https://ark.cn-beijing.volces.com/api/plan/v3';
-
-/** 浏览器不能给 Agent Plan 地址带鉴权头，旧默认值改到平台 OpenAI 地址。 */
-function browserTextBaseUrl(protocol: ArkProtocol, raw: unknown): string {
-  const value = typeof raw === 'string' ? raw.trim().replace(/\/+$/, '') : '';
-  if (!value || (protocol === 'openai' && value === LEGACY_PLAN_OPENAI_BASE)) {
-    return ARK_DEFAULT_BASE_URLS[protocol];
+/** 去掉粘贴时常见的 Bearer 前缀与引号，避免鉴权头变成 Bearer Bearer … */
+export function sanitizeApiKey(raw: string): string {
+  let key = raw.trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
   }
-  return value;
+  return key.replace(/^Bearer\s+/i, '').trim();
 }
 
 /** 用协议默认值补齐设置（旧版本只有一把 apiKey 时，同时填入图片/文本通道） */
 function withDefaults(raw: Partial<ModelSettings>): ModelSettings {
   const protocol = normalizeProtocol(raw.protocol);
-  const shared = trimmedString(raw.apiKey) ?? '';
-  const imageApiKey = trimmedString(raw.imageApiKey) ?? shared;
-  const textApiKey = trimmedString(raw.textApiKey) ?? shared;
+  const shared = sanitizeApiKey(trimmedString(raw.apiKey) ?? '');
+  const imageApiKey = sanitizeApiKey(trimmedString(raw.imageApiKey) ?? shared);
+  const textApiKey = sanitizeApiKey(trimmedString(raw.textApiKey) ?? shared);
   return {
     apiKey: imageApiKey || textApiKey,
     imageApiKey,
@@ -51,20 +52,23 @@ function withDefaults(raw: Partial<ModelSettings>): ModelSettings {
         ? raw.imageBaseUrl.trim()
         : ARK_IMAGE_DEFAULT_BASE_URL,
     protocol,
-    baseUrl: browserTextBaseUrl(protocol, raw.baseUrl),
+    baseUrl:
+      typeof raw.baseUrl === 'string' && raw.baseUrl.trim()
+        ? raw.baseUrl.trim().replace(/\/+$/, '')
+        : ARK_DEFAULT_BASE_URLS[protocol],
   };
 }
 
 /** 图片通道实际使用的 Key：优先 imageApiKey，旧数据回落到 apiKey。 */
 export function imageApiKeyOf(settings: ModelSettings | null | undefined): string {
   if (!settings) return '';
-  return (settings.imageApiKey || settings.apiKey || '').trim();
+  return sanitizeApiKey(settings.imageApiKey || settings.apiKey || '');
 }
 
 /** 文本通道实际使用的 Key：优先 textApiKey，旧数据回落到 apiKey。 */
 export function textApiKeyOf(settings: ModelSettings | null | undefined): string {
   if (!settings) return '';
-  return (settings.textApiKey || settings.apiKey || '').trim();
+  return sanitizeApiKey(settings.textApiKey || settings.apiKey || '');
 }
 
 export function isImageConfigured(settings: ModelSettings | null | undefined): settings is ModelSettings {
@@ -208,7 +212,7 @@ export function localizeUpstreamError(
   if (errorClass === 'invalid-key') {
     return {
       message:
-        '当前 API Key 未被图片接口接受。请使用火山方舟控制台「API Key 管理」创建的 Key，不要使用 Agent Plan / Coding Plan 的 Key。',
+        '当前 API Key 未被方舟接受。请使用控制台「API Key 管理」创建的 Platform API Key；Agent Plan / Coding Plan 的订阅密钥不能用于当前平台接口（/api/v3）。',
       requestId,
     };
   }

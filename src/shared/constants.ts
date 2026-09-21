@@ -8,15 +8,16 @@ export type ArkProtocol = 'openai' | 'anthropic';
 
 /**
  * 各协议的默认 Base URL（可在模型设置中修改）。
+ * 浏览器直连需用平台地址（/api/v3）；Agent Plan（/api/plan）在浏览器里会拦鉴权头。
  * - OpenAI 兼容：{base}/chat/completions
  * - Anthropic 兼容：{base}/v1/messages
  */
 export const ARK_DEFAULT_BASE_URLS: Record<ArkProtocol, string> = {
   openai: 'https://ark.cn-beijing.volces.com/api/v3',
-  anthropic: 'https://ark.cn-beijing.volces.com/api/plan',
+  anthropic: 'https://ark.cn-beijing.volces.com/api/v3',
 };
 
-/** 火山方舟 Platform 图片生成接口；与 Agent Plan 文本基址分开配置。 */
+/** 火山方舟 Platform 图片生成接口默认基址。 */
 export const ARK_IMAGE_DEFAULT_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
 /** 当前商品图主流程推荐并完成参数适配的模型版本。 */
 export const SEEDREAM_5_MODEL_ID = 'doubao-seedream-5-0-260128';

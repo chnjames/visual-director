@@ -25,7 +25,7 @@ const PORT = Number(process.env.PORT || 5173);
 
 const DEFAULT_BASE = {
   openai: 'https://ark.cn-beijing.volces.com/api/v3',
-  anthropic: 'https://ark.cn-beijing.volces.com/api/plan',
+  anthropic: 'https://ark.cn-beijing.volces.com/api/v3',
 };
 const IMAGE_DEFAULT_BASE = 'https://ark.cn-beijing.volces.com/api/v3';
 const API_PATH = { openai: '/chat/completions', anthropic: '/v1/messages' };

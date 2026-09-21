@@ -346,7 +346,7 @@ export function ModelSettingsModal({ open, initial, onSave, onClear, onClose, em
                 {showTextKey ? '隐藏' : '显示'}
               </button>
             </div>
-            <span className="hint">须与图片相同：用「API Key 管理」的 Platform Key，不是 Agent Plan 订阅密钥</span>
+            <span className="hint">使用「API Key 管理」的 Platform Key（与图片通道相同来源即可）</span>
           </label>
           <label className="field">
             <span>Endpoint</span>
@@ -391,9 +391,9 @@ export function ModelSettingsModal({ open, initial, onSave, onClear, onClose, em
                 <span className="hint">实际请求 {buildArkUpstreamUrl(protocol, baseUrl)}</span>
               )}
               {baseOk && /\/api\/plan(?:\/|$)/.test(baseUrl) && (
-                <span className="hint">
-                  Agent Plan 地址在浏览器里可能拦鉴权头；若测试失败，可改用
-                  https://ark.cn-beijing.volces.com/api/v3（需 Platform API Key）
+                <span className="hint err">
+                  不建议使用 Agent Plan 地址：浏览器会拦鉴权头。请改回
+                  https://ark.cn-beijing.volces.com/api/v3，并使用 Platform API Key
                 </span>
               )}
             </label>

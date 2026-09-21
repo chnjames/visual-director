@@ -30,6 +30,7 @@ import {
   buildAnalyzeLog,
   buildGenerateLog,
   buildPromptLog,
+  clearNodeRunFeedbackPatch,
   writeGenerateLocal,
   writeGenerateWorkflow,
 } from '../workflow/graph/runIo';
@@ -184,6 +185,7 @@ export function WorkflowEditorPage({
         }
         setRunningNodeId(latest.id);
         setNodeRunPreview(null);
+        d.updateNodeConfigs(latest.id, clearNodeRunFeedbackPatch());
         const started = Date.now();
         try {
           const result = await extractRecipe(d.graph, settings, undefined, latest.id);
@@ -259,7 +261,11 @@ export function WorkflowEditorPage({
           }
         } catch (e) {
           const msg = (e as Error).message || '分析失败';
-          d.updateNodeConfigs(latest.id, { analysisOutput: msg });
+          d.updateNodeConfigs(latest.id, {
+            analysisOutput: msg,
+            lastRunOk: false,
+            lastRunMessage: msg,
+          });
           setNodeRunPreview({ nodeId: latest.id, message: msg, status: 'error' });
         } finally {
           setRunningNodeId(null);
@@ -270,6 +276,7 @@ export function WorkflowEditorPage({
       if (latest.type === 'promptEditor' || latest.type === 'promptCompiler') {
         setRunningNodeId(latest.id);
         setNodeRunPreview(null);
+        d.updateNodeConfigs(latest.id, clearNodeRunFeedbackPatch());
         const started = Date.now();
         const preview = previewPromptNode(d.graph, latest.id);
         const durationMs = Date.now() - started;
@@ -324,6 +331,7 @@ export function WorkflowEditorPage({
         }
         setRunningNodeId(latest.id);
         setNodeRunPreview(null);
+        d.updateNodeConfigs(latest.id, clearNodeRunFeedbackPatch());
         const started = Date.now();
         try {
           const result = await generateAndAudit(d.graph, settings, null, undefined, latest.id);
@@ -439,6 +447,19 @@ export function WorkflowEditorPage({
     runningRef.current = generate?.id ?? extract?.id ?? null;
     setRunningNodeId(runningRef.current);
     setNodeRunPreview(null);
+    for (const node of graph.nodes) {
+      if (
+        node.type === 'referenceAnalyze' ||
+        node.type === 'recipeExtractor' ||
+        node.type === 'promptEditor' ||
+        node.type === 'promptCompiler' ||
+        node.type === 'sceneGenerate' ||
+        node.type === 'sceneGenerator' ||
+        node.type === 'resultGallery'
+      ) {
+        d.updateNodeConfigs(node.id, clearNodeRunFeedbackPatch());
+      }
+    }
     const started = Date.now();
     try {
       const result = await runConnectedGraph(graph, settings, {
@@ -449,6 +470,7 @@ export function WorkflowEditorPage({
           }
           runningRef.current = id;
           setRunningNodeId(id);
+          d.updateNodeConfigs(id, clearNodeRunFeedbackPatch());
         },
       });
       if (result.status === 'failed') {

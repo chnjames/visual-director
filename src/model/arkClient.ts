@@ -182,7 +182,7 @@ async function postToArk(
     const error = createSafeError(
       aborted ? 'timeout' : 'network',
       aborted
-        ? `请求超时（>${timeoutMs}ms）`
+        ? `模型在 ${(timeoutMs / 1000).toFixed(0)} 秒内未返回。参考图分析较慢，可换更小的参考图、确认文本 Endpoint 可用后再试。`
         : `无法连接 ${targetUrl}：${detail}。${planCorsHint(targetUrl)}`,
       baseDiag(),
       apiKey,

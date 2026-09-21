@@ -206,6 +206,15 @@ export function generateNodePatch(
   };
 }
 
+/** 开跑前清掉卡片上的旧成功/失败态，避免「运行中」与上次错误叠在一起。 */
+export function clearNodeRunFeedbackPatch(): Record<string, unknown> {
+  return {
+    lastRunOk: null,
+    lastRunMessage: null,
+    lastRunIo: null,
+  };
+}
+
 export function galleryNodePatch(images: PreviewImage[], message: string, ok: boolean, log: NodeRunLog): Record<string, unknown> {
   return {
     lastOutputImages: images,

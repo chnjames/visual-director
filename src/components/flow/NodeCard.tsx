@@ -194,7 +194,7 @@ export function NodeCard({
       {node.type === 'promptEditor' && <PromptEditorSummary node={node} />}
       {node.type === 'referenceAnalyze' && <AnalyzeNodeSummary node={node} />}
 
-      <NodeOutputStrip node={node} />
+      <NodeOutputStrip node={node} running={running} />
 
       {/* 单独运行（可执行节点）；完整配置与结果在右侧抽屉 */}
       {!isPlanned && onRunNode && isSoloRunnableNode(node.type) && (
@@ -245,10 +245,11 @@ export function NodeCard({
   );
 }
 
-function NodeOutputStrip({ node }: { node: NodeInstance }) {
+function NodeOutputStrip({ node, running = false }: { node: NodeInstance; running?: boolean }) {
   const images = readPreviewImages(node.config.lastOutputImages);
-  const failed = node.config.lastRunOk === false && typeof node.config.lastRunMessage === 'string';
-  const log = readRunLog(node.config.lastRunIo);
+  const failed =
+    !running && node.config.lastRunOk === false && typeof node.config.lastRunMessage === 'string';
+  const log = !running ? readRunLog(node.config.lastRunIo) : null;
   const logLine = log ? (
     <div className="fn-run-log">
       {log.scope === 'workflow' ? '整图' : '单节点'} · {log.ok ? '完成' : '失败'}

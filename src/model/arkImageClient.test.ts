@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateImage } from './arkClient';
-import { IMAGES_PROXY_PATH } from '../shared/constants';
+import { buildArkImageUrl } from '../shared/constants';
 import type { ModelSettings } from '../shared/types';
 
 const SECRET = 'sk-img-secret-9999';
@@ -43,11 +43,11 @@ describe('generateImage client', () => {
     if (!r.ok) expect(r.errorClass).toBe('illegal-endpoint');
   });
 
-  it('成功：走 /api/ark/images，Key 只在头，prompt 原样下发，返回 b64', async () => {
+  it('成功：直接请求图片 Base URL，Key 只在鉴权头，prompt 原样下发', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ ok: true, b64Json: 'QUJD', mediaType: 'image/png', diagnostics: {} }),
+      json: async () => ({ data: [{ b64_json: 'QUJD' }] }),
     });
     const folded = '正向提示\n\n避免：红字';
     const r = await generateImage(SETTINGS, folded, { timeoutMs: 6000 });
@@ -55,13 +55,13 @@ describe('generateImage client', () => {
     if (r.ok) expect(r.b64Json).toBe('QUJD');
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toBe(IMAGES_PROXY_PATH);
-    expect(init.headers['x-ark-api-key']).toBe(SECRET);
+    expect(String(url)).toBe(buildArkImageUrl(SETTINGS.imageBaseUrl!));
+    expect(init.headers.authorization).toBe(`Bearer ${SECRET}`);
     const body = JSON.parse(init.body);
-    expect(body.imageEndpoint).toBe('ep-seedream');
+    expect(body.model).toBe('ep-seedream');
     expect(body.prompt).toContain('正向提示');
     expect(body.prompt).toContain('避免：红字');
-    // Key 不进 URL/体
+    expect(body.response_format).toBe('b64_json');
     expect(init.body).not.toContain(SECRET);
     expect(String(url)).not.toContain(SECRET);
   });
@@ -70,7 +70,7 @@ describe('generateImage client', () => {
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ ok: true, b64Json: 'QUJD', mediaType: 'image/png', diagnostics: {} }),
+      json: async () => ({ data: [{ b64_json: 'QUJD' }] }),
     });
     const imageKey = 'sk-image-only-1111';
     await generateImage(
@@ -83,16 +83,16 @@ describe('generateImage client', () => {
       'p',
     );
     const init = fetchMock.mock.calls[0][1];
-    expect(init.headers['x-ark-api-key']).toBe(imageKey);
+    expect(init.headers.authorization).toBe(`Bearer ${imageKey}`);
     expect(init.body).not.toContain(imageKey);
     expect(init.body).not.toContain('sk-text-only-2222');
   });
 
-  it('代理返回业务错误时透传 errorClass', async () => {
+  it('上游错误按 HTTP 状态分类', async () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 502,
-      json: async () => ({ ok: false, errorClass: 'server', message: '未返回 b64_json' }),
+      json: async () => ({ error: { message: '未返回 b64_json' } }),
     });
     const r = await generateImage(SETTINGS, 'p');
     expect(r.ok).toBe(false);
@@ -104,14 +104,7 @@ describe('generateImage client', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        ok: true,
-        b64Json: 'QUFB',
-        mediaType: 'image/png',
-        images: [
-          { b64Json: 'QUFB', mediaType: 'image/png' },
-          { b64Json: 'QkJC', mediaType: 'image/png' },
-        ],
-        diagnostics: {},
+        data: [{ b64_json: 'QUFB' }, { b64_json: 'QkJC' }],
       }),
     });
     const r = await generateImage(SETTINGS, '商品场景图', {
@@ -128,11 +121,13 @@ describe('generateImage client', () => {
     });
     expect(r.ok && r.images).toHaveLength(2);
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(String(fetchMock.mock.calls[0][0])).toBe(buildArkImageUrl(SETTINGS.imageBaseUrl!));
     expect(body).toMatchObject({
-      imageBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+      model: 'ep-seedream',
       size: '1728x2304',
-      count: 2,
-      images: ['data:image/png;base64,QUJD'],
+      image: ['data:image/png;base64,QUJD'],
+      sequential_image_generation: 'auto',
+      sequential_image_generation_options: { max_images: 2 },
     });
   });
 
@@ -140,10 +135,11 @@ describe('generateImage client', () => {
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ ok: true, b64Json: 'QUJD', mediaType: 'image/png', diagnostics: {} }),
+      json: async () => ({ data: [{ b64_json: 'QUJD' }] }),
     });
     await generateImage({ ...SETTINGS, imageBaseUrl: undefined }, 'p');
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.imageBaseUrl).toBe('https://ark.cn-beijing.volces.com/api/v3');
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      buildArkImageUrl('https://ark.cn-beijing.volces.com/api/v3'),
+    );
   });
 });

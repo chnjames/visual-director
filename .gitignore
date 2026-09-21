@@ -1,0 +1,40 @@
+# 依赖
+node_modules/
+.pnp
+.pnp.js
+
+# 构建产物与工具缓存
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+.vite/
+
+# 环境变量（绝不提交真实密钥）
+.env
+.env.*
+!.env.example
+
+# 日志
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 编辑器/系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.cursor/
+.DS_Store
+Thumbs.db
+
+# 本地验证用的临时页面（不是产品入口）
+_cv3.html
+
+# 测试缓存与本地原型
+coverage/
+.vitest/
+design-prototype/

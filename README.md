@@ -111,7 +111,7 @@ npm run serve
 | **浏览器直连（默认）** | 普通 `npm run build` / `npm run dev` | 浏览器通过 CORS 直接请求火山 Platform API；火山按 Origin 反射放行 |
 | **同源代理** | `VITE_USE_SERVER_PROXY=1 npm run build` | 模型请求改走同源端点 `/api/ark/chat`、`/api/ark/images` |
 
-仓库内置 Vercel 配置：`vercel.json` 已在构建命令中注入开关，`api/ark/chat.js`、`api/ark/images.js` 复用 `src/server/` 的代理处理器，推送到 Vercel 后自动生效。同源路径不依赖用户浏览器到火山接口的网络连通性，并在服务端做字段白名单与 SSRF 校验。
+仓库内置 Vercel 配置：`vercel.json` 已在构建命令中注入开关，`api/ark/chat.ts`、`api/ark/images.ts` 是自包含的 Serverless 函数（独立实现，不依赖 `src/` 打包，规避平台对项目 TS 模块链的编译限制），推送到 Vercel 后自动生效。同源路径不依赖用户浏览器到火山接口的网络连通性，并在服务端做字段白名单与 SSRF 校验。
 
 ## 模型配置
 
@@ -171,7 +171,7 @@ npm run serve
 
 ```text
 visual-director/
-├─ api/                     # Vercel Serverless 同源代理入口（chat / images）
+├─ api/                     # Vercel Serverless 同源代理（chat / images，自包含）
 ├─ docs/                    # 产品、架构、数据、安全与验收文档
 ├─ scripts/                 # HTTP 冒烟检查脚本
 ├─ server/                  # 自部署静态服务器（零依赖 Node.js）

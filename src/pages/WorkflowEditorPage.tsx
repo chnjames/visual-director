@@ -209,6 +209,10 @@ export function WorkflowEditorPage({
               lastRunMessage: log.message,
               lastRunIo: log,
             });
+            for (const editor of promptEditorsFedBy(d.graph, latest.id)) {
+              const patch = autoFillPromptPatch(editor.config, result.suggestedPrompt);
+              if (patch) d.updateNodeConfigs(editor.id, patch);
+            }
             const message = result.meta.conflictHint
               ? `分析完成（有冲突提示）· 结果已写入检查器`
               : '分析完成，结果已写入检查器';
@@ -474,6 +478,29 @@ export function WorkflowEditorPage({
         },
       });
       if (result.status === 'failed') {
+        const extraction = result.extraction;
+        if (extraction?.ok && extract) {
+          d.updateNodeConfigs(extract.id, {
+            analysisOutput: extraction.summary,
+            lastRecipe: extraction.recipe,
+            analysisMeta: extraction.meta,
+            purpose: extraction.purpose || extract.config.purpose || '',
+            suggestedPrompt: extraction.suggestedPrompt,
+            lastRunOk: true,
+            lastRunIo: buildAnalyzeLog({
+              scope: 'workflow',
+              node: extract,
+              summary: extraction.summary,
+              suggestedPrompt: extraction.suggestedPrompt,
+              ok: true,
+              durationMs: Date.now() - started,
+            }),
+          });
+          for (const editor of promptEditorsFedBy(graph, extract.id)) {
+            const patch = autoFillPromptPatch(editor.config, extraction.suggestedPrompt);
+            if (patch) d.updateNodeConfigs(editor.id, patch);
+          }
+        }
         const failedId = result.state.steps.find((step) => step.status === 'failed')?.nodeId ?? generate?.id;
         if (failedId) {
           d.updateNodeConfigs(failedId, {

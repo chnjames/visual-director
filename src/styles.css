@@ -3020,6 +3020,14 @@ table.features th {
 .generation-summary > p.is-empty {
   color: var(--c-muted);
 }
+.generation-summary > p.is-error {
+  color: var(--c-danger, #b42318);
+  background: color-mix(in srgb, var(--c-danger, #b42318) 8%, var(--c-mist-soft));
+}
+.generation-summary > p.analyze-prompt-preview {
+  -webkit-line-clamp: 2;
+  color: var(--c-muted);
+}
 .generation-summary-spec {
   display: flex;
   gap: 5px;

@@ -494,7 +494,7 @@ export async function generateImage(
     return createSafeError(
       aborted ? 'timeout' : 'network',
       aborted
-        ? `图片生成超时（>${timeoutMs}ms）`
+        ? `图片生成超时（>${timeoutMs}ms）。2K/3K 或多张商品图较慢，可先减商品图数量或降到 1K 后重试。`
         : `无法连接 ${targetUrl}：${redactSecret(describeNetworkFailure(err), imageApiKey)}。${planCorsHint(targetUrl)}`,
       diag(),
       imageApiKey,

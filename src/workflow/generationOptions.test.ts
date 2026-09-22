@@ -18,7 +18,7 @@ describe('生成默认值', () => {
   it('写出的配置只含四个生成字段', () => {
     expect(generationDefaultsToConfig(DEFAULT_GENERATION_DEFAULTS)).toEqual({
       aspectRatio: '1:1',
-      resolution: '2K',
+      resolution: '1K',
       count: 1,
       targetUse: 'main-scene',
     });

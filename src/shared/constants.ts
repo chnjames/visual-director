@@ -45,7 +45,7 @@ export const IMAGES_PROXY_PATH = '/api/ark/images';
 /** OpenAI 兼容图片生成接口在 Base URL 之后拼接的路径 */
 export const ARK_IMAGE_PATH = '/images/generations';
 /** 图片生成通常比视觉理解更慢，给足上限内的超时 */
-export const ARK_IMAGE_TIMEOUT_MS = 180_000;
+export const ARK_IMAGE_TIMEOUT_MS = 300_000;
 
 /**
  * 图片生成只走 OpenAI 兼容面（Anthropic 无图片生成接口）。
@@ -71,7 +71,7 @@ export function resolveOpenaiBaseUrl(_protocol: ArkProtocol, imageBaseUrl: strin
 export const ARK_TEST_TIMEOUT_MS = 30_000;
 export const ARK_PROBE_TIMEOUT_MS = 180_000;
 export const ARK_MIN_TIMEOUT_MS = 5_000;
-export const ARK_MAX_TIMEOUT_MS = 180_000;
+export const ARK_MAX_TIMEOUT_MS = 300_000;
 /** 代理默认超时（毫秒），超时归类为 timeout，不无限挂起 */
 export const ARK_REQUEST_TIMEOUT_MS = 120_000;
 

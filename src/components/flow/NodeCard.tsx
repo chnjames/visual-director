@@ -388,11 +388,28 @@ function PromptEditorSummary({ node }: { node: NodeInstance }) {
 
 function AnalyzeNodeSummary({ node }: { node: NodeInstance }) {
   const suggested = suggestedFromAnalyze(node);
+  const failed =
+    node.config.lastRunOk === false && typeof node.config.lastRunMessage === 'string';
+  const preview = suggested
+    ? suggested
+        .split(/\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('\n')
+    : '';
   return (
     <div className="generation-summary" data-testid="analyze-node-status">
-      <p className={suggested ? '' : 'is-empty'}>
-        {suggested ? '建议提示词已生成，打开检查器采用' : '上传参考图后试运行，生成建议提示词'}
-      </p>
+      {failed ? (
+        <p className="is-error">{String(node.config.lastRunMessage)}</p>
+      ) : suggested ? (
+        <>
+          <p data-testid="analyze-node-done">分析完成</p>
+          {preview ? <p className="analyze-prompt-preview">{preview}</p> : null}
+        </>
+      ) : (
+        <p className="is-empty">上传参考图后试运行，生成建议提示词</p>
+      )}
     </div>
   );
 }

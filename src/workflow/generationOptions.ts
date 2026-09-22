@@ -24,12 +24,19 @@ export const ASPECT_RATIO_OPTIONS: GenerationOption[] = [
 ];
 
 export const RESOLUTION_OPTIONS: GenerationOption[] = [
+  { value: '1K', label: '1K · 快速预览' },
   { value: '2K', label: '2K · 标准输出' },
   { value: '3K', label: '3K · 高清输出' },
 ];
 
-export function normalizeGenerationResolution(value: unknown): '2K' | '3K' {
-  return String(value ?? '').toUpperCase() === '3K' ? '3K' : '2K';
+export type GenerationResolution = '1K' | '2K' | '3K';
+
+export function normalizeGenerationResolution(value: unknown): GenerationResolution {
+  const key = String(value ?? '').toUpperCase();
+  if (key === '3K') return '3K';
+  if (key === '2K') return '2K';
+  if (key === '1K' || key === '1024') return '1K';
+  return '1K';
 }
 
 export function generationOptionLabel(
@@ -61,14 +68,14 @@ export function fieldEnumLabel(field: { key: string; dataType?: string }, value:
 /** 项目级生成默认值：只作用于之后新加入的商品场景生成节点。 */
 export type GenerationDefaults = {
   aspectRatio: string;
-  resolution: '2K' | '3K';
+  resolution: GenerationResolution;
   count: number;
   targetUse: string;
 };
 
 export const DEFAULT_GENERATION_DEFAULTS: GenerationDefaults = {
   aspectRatio: '1:1',
-  resolution: '2K',
+  resolution: '1K',
   count: 1,
   targetUse: 'main-scene',
 };

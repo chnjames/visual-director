@@ -193,7 +193,7 @@ export type GraphRunResult =
       proposal: RepairProposal;
       summary: string;
     }
-  | { status: 'failed'; state: GraphRunState; message: string };
+  | { status: 'failed'; state: GraphRunState; message: string; extraction?: RecipeExtraction | null; generation?: GenerationRun | null };
 
 /** 图上是否有会产出配方的节点。有的话，生成前必须确认。 */
 export function graphHasRecipeSource(graph: WorkflowGraph): boolean {
@@ -760,7 +760,7 @@ export async function generateAndAudit(
 
   const size = generationSize(
     String(generate.config.aspectRatio ?? '1:1'),
-    String(generate.config.resolution ?? '2K'),
+    String(generate.config.resolution ?? '1K'),
   );
   const count = Math.min(4, Math.max(1, Number(generate.config.count) || 1));
   const imgRes = await runners.image(settings, positivePrompt, negativePrompt, {
@@ -850,8 +850,16 @@ export async function generateAndAudit(
 }
 
 export function generationSize(aspectRatio: string, resolution: string): string {
-  const tier = resolution === '3K' ? '3K' : '2K';
+  const key = String(resolution ?? '').toUpperCase();
+  const tier = key === '3K' ? '3K' : key === '2K' ? '2K' : '1K';
   const sizes: Record<string, Record<string, string>> = {
+    '1K': {
+      '1:1': '1024x1024',
+      '3:4': '864x1152',
+      '4:3': '1152x864',
+      '16:9': '1424x800',
+      '9:16': '800x1424',
+    },
     '2K': {
       '1:1': '2048x2048',
       '3:4': '1728x2304',
@@ -991,6 +999,13 @@ export async function runConnectedGraph(
 
   let extraction: RecipeExtraction | null = null;
   let generation: GenerationRun | null = null;
+  const fail = (message: string): Extract<GraphRunResult, { status: 'failed' }> => ({
+    status: 'failed',
+    state,
+    message,
+    extraction,
+    generation,
+  });
   const confirmed =
     (options.confirmedRecipe?.confirmedAt ? options.confirmedRecipe : null) ??
     confirmedRecipeFromGraph(graph);
@@ -1041,7 +1056,7 @@ export async function runConnectedGraph(
       state.callsUsed += res.callsUsed;
       if (!res.ok) {
         state.steps.push({ nodeId, title, status: 'failed', message: res.message });
-        return { status: 'failed', state, message: res.message };
+        return fail(res.message);
       }
       extraction = res;
       node.config.suggestedPrompt = res.suggestedPrompt;
@@ -1104,7 +1119,7 @@ export async function runConnectedGraph(
           (extraction && extraction.ok ? extraction.recipe : null);
         if (!pending) {
           state.steps.push({ nodeId, title, status: 'failed', message: '没有待确认配方' });
-          return { status: 'failed', state, message: '没有待确认配方' };
+          return fail('没有待确认配方');
         }
         const purpose =
           purposeOf(graph, state.ports, node.id) ||
@@ -1139,7 +1154,7 @@ export async function runConnectedGraph(
       if (!isTextConfigured(settings)) {
         const message = '尚未配置文本模型，不能提取商品身份。';
         state.steps.push({ nodeId, title, status: 'failed', message });
-        return { status: 'failed', state, message };
+        return fail(message);
       }
       const products = productImagesOf(graph, node, state.ports);
       if (
@@ -1148,7 +1163,7 @@ export async function runConnectedGraph(
       ) {
         const message = `请先上传 ${LIMITS.identityImagesMin}–${LIMITS.identityImagesMax} 张同一商品多角度图。`;
         state.steps.push({ nodeId, title, status: 'failed', message });
-        return { status: 'failed', state, message };
+        return fail(message);
       }
       const statement =
         purposeOf(graph, state.ports, node.id) ||
@@ -1157,13 +1172,13 @@ export async function runConnectedGraph(
       if (!runners.identity) {
         const message = '商品身份节点缺少执行适配器。';
         state.steps.push({ nodeId, title, status: 'failed', message });
-        return { status: 'failed', state, message };
+        return fail(message);
       }
       const result = await runners.identity(settings, products, statement);
       state.callsUsed += 1;
       if (!result.ok) {
         state.steps.push({ nodeId, title, status: 'failed', message: result.message });
-        return { status: 'failed', state, message: result.message };
+        return fail(result.message);
       }
       const candidates = result.data.map((feature) => ({ ...feature, status: 'pending' as const }));
       writePort(state.ports, node.id, 'features', {
@@ -1193,7 +1208,7 @@ export async function runConnectedGraph(
         if (!pending.length) {
           const message = '没有待确认的商品身份候选';
           state.steps.push({ nodeId, title, status: 'failed', message });
-          return { status: 'failed', state, message };
+          return fail(message);
         }
         state.pausedNodeId = node.id;
         state.steps.push({ nodeId, title, status: 'paused', message: '等待确认商品身份' });
@@ -1214,7 +1229,7 @@ export async function runConnectedGraph(
       const errMsg = bindPromptNode(graph, node, state.ports);
       if (errMsg) {
         state.steps.push({ nodeId, title, status: 'failed', message: errMsg });
-        return { status: 'failed', state, message: errMsg };
+        return fail(errMsg);
       }
       state.steps.push({ nodeId, title, status: 'ok', message: '提示词已绑定到出端口' });
       continue;
@@ -1252,7 +1267,7 @@ export async function runConnectedGraph(
             images: res.images,
           });
         }
-        return { status: 'failed', state, message: res.message };
+        return fail(res.message);
       }
       writePort(state.ports, node.id, 'image', {
         kind: 'image',
@@ -1310,7 +1325,7 @@ export async function runConnectedGraph(
       }
       if (!isTextConfigured(settings)) {
         state.steps.push({ nodeId, title, status: 'failed', message: '尚未配置文本模型，不能验收' });
-        return { status: 'failed', state, message: '尚未配置文本模型，不能验收' };
+        return fail('尚未配置文本模型，不能验收');
       }
       const candidate: UploadedImage = {
         id: 'generated',
@@ -1323,7 +1338,7 @@ export async function runConnectedGraph(
       state.callsUsed += 1;
       if (!auditRes.ok) {
         state.steps.push({ nodeId, title, status: 'failed', message: auditRes.message });
-        return { status: 'failed', state, message: auditRes.message };
+        return fail(auditRes.message);
       }
       writePort(state.ports, node.id, 'audit', { kind: 'audit', audit: auditRes.data });
       writePort(state.ports, node.id, 'final', {
@@ -1351,7 +1366,7 @@ export async function runConnectedGraph(
       if (promptPort?.kind !== 'prompt') {
         const message = '缺少编译后的 Prompt，不能生成修复方案';
         state.steps.push({ nodeId, title, status: 'failed', message });
-        return { status: 'failed', state, message };
+        return fail(message);
       }
       const currentImage = [...Object.values(state.ports)]
         .reverse()
@@ -1359,7 +1374,7 @@ export async function runConnectedGraph(
       if (!currentImage) {
         const message = '缺少失败的生成图，不能修复';
         state.steps.push({ nodeId, title, status: 'failed', message });
-        return { status: 'failed', state, message };
+        return fail(message);
       }
       const boundRecipe =
         confirmed ??
@@ -1371,7 +1386,7 @@ export async function runConnectedGraph(
       if (!boundRecipe?.confirmedAt) {
         const message = '缺少已确认配方，不能修复';
         state.steps.push({ nodeId, title, status: 'failed', message });
-        return { status: 'failed', state, message };
+        return fail(message);
       }
       const identityFeatures = Object.values(state.ports).find(
         (value): value is Extract<PortValue, { kind: 'identity' }> =>
@@ -1398,7 +1413,7 @@ export async function runConnectedGraph(
         if (!isTextConfigured(settings) || !runners.repair) {
           const message = '尚未配置修复模型或修复适配器';
           state.steps.push({ nodeId, title, status: 'failed', message });
-          return { status: 'failed', state, message };
+          return fail(message);
         }
         const highRisk = isHighRiskAudit(auditPort.audit.issues);
         const repairResult = await runners.repair(
@@ -1415,7 +1430,7 @@ export async function runConnectedGraph(
         state.callsUsed += 1;
         if (!repairResult.ok) {
           state.steps.push({ nodeId, title, status: 'failed', message: repairResult.message });
-          return { status: 'failed', state, message: repairResult.message };
+          return fail(repairResult.message);
         }
         writePort(state.ports, node.id, 'patch', {
           kind: 'repair',
@@ -1435,7 +1450,7 @@ export async function runConnectedGraph(
       if (!isImageConfigured(settings)) {
         const message = '尚未配置图片生成 Endpoint，不能应用修复';
         state.steps.push({ nodeId, title, status: 'failed', message });
-        return { status: 'failed', state, message };
+        return fail(message);
       }
       const proposal = options.confirmedRepair;
       const repairedPositive =
@@ -1450,7 +1465,7 @@ export async function runConnectedGraph(
       state.callsUsed += 1;
       if (!imageResult.ok) {
         state.steps.push({ nodeId, title, status: 'failed', message: imageResult.message });
-        return { status: 'failed', state, message: imageResult.message };
+        return fail(imageResult.message);
       }
       const repairedDataUri = `data:${imageResult.mediaType};base64,${imageResult.b64Json}`;
       const repairedCandidate: UploadedImage = {
@@ -1469,7 +1484,7 @@ export async function runConnectedGraph(
       state.callsUsed += 1;
       if (!auditResult.ok) {
         state.steps.push({ nodeId, title, status: 'failed', message: auditResult.message });
-        return { status: 'failed', state, message: auditResult.message };
+        return fail(auditResult.message);
       }
       const generator = graph.nodes.find((item) => GENERATE_TYPES.has(item.type));
       const auditor = graph.nodes.find((item) => item.type === 'resultAuditor');

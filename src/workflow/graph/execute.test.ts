@@ -36,15 +36,19 @@ const settings: ModelSettings = {
 };
 
 describe('Seedream 5.0 输出尺寸', () => {
-  it('按 2K/3K 与比例映射到官方有效像素尺寸', () => {
+  it('按 1K/2K/3K 与比例映射到官方有效像素尺寸', () => {
+    expect(generationSize('1:1', '1K')).toBe('1024x1024');
+    expect(generationSize('3:4', '1K')).toBe('864x1152');
+    expect(generationSize('16:9', '1K')).toBe('1424x800');
     expect(generationSize('1:1', '2K')).toBe('2048x2048');
     expect(generationSize('3:4', '2K')).toBe('1728x2304');
     expect(generationSize('16:9', '2K')).toBe('2848x1600');
     expect(generationSize('9:16', '3K')).toBe('2304x4096');
   });
 
-  it('旧草稿分辨率安全迁移到 2K 方形默认值', () => {
-    expect(generationSize('unknown', '1024')).toBe('2048x2048');
+  it('旧草稿分辨率安全迁移到 1K 方形默认值', () => {
+    expect(generationSize('unknown', '1024')).toBe('1024x1024');
+    expect(generationSize('1:1', 'unknown')).toBe('1024x1024');
   });
 });
 
@@ -694,6 +698,56 @@ describe('精简主线提示词契约', () => {
     expect(result.status).toBe('done');
     if (result.status !== 'done') return;
     expect(result.generation?.ok).toBe(true);
+  });
+
+  it('分析成功但生成失败时，failed 仍带回 extraction', async () => {
+    const g = mainlineGraph();
+    const runners: StandardRunners = {
+      recipe: async () => ({ ok: true, data: recipe(), raw: raw() }),
+      image: async () => ({
+        ok: false,
+        errorClass: 'timeout',
+        message: '图片生成超时（>300000ms）',
+        diagnostics: { endpointMasked: 'ep', model: 'm' },
+      }),
+      audit: async () => ({ ok: false, errorClass: 'bad-request', message: 'no', diagnostics: { endpointMasked: 'x', model: 'x' } }),
+    };
+    const result = await runConnectedGraph(g, settings, { runners });
+    expect(result.status).toBe('failed');
+    if (result.status !== 'failed') return;
+    expect(result.message).toMatch(/超时/);
+    expect(result.extraction?.ok).toBe(true);
+    if (!result.extraction?.ok) return;
+    expect(result.extraction.suggestedPrompt).toContain('主体位置');
+    const analyze = g.nodes.find((n) => n.type === 'referenceAnalyze')!;
+    expect(analyze.config.suggestedPrompt).toBe(result.extraction.suggestedPrompt);
+  });
+
+  it('生成失败后可用 extraction 自动填充未手改的提示词节点', async () => {
+    const g = mainlineGraph();
+    const runners: StandardRunners = {
+      recipe: async () => ({ ok: true, data: recipe(), raw: raw() }),
+      image: async () => ({
+        ok: false,
+        errorClass: 'timeout',
+        message: '图片生成超时（>300000ms）',
+        diagnostics: { endpointMasked: 'ep', model: 'm' },
+      }),
+      audit: async () => ({ ok: false, errorClass: 'bad-request', message: 'no', diagnostics: { endpointMasked: 'x', model: 'x' } }),
+    };
+    const result = await runConnectedGraph(g, settings, { runners });
+    expect(result.status).toBe('failed');
+    if (result.status !== 'failed' || !result.extraction?.ok) return;
+    const analyze = g.nodes.find((n) => n.type === 'referenceAnalyze')!;
+    const editor = g.nodes.find((n) => n.type === 'promptEditor')!;
+    expect(editor.config.positivePrompt).toBe('');
+    const { autoFillPromptPatch, promptEditorsFedBy } = await import('./promptText');
+    for (const target of promptEditorsFedBy(g, analyze.id)) {
+      const patch = autoFillPromptPatch(target.config, result.extraction.suggestedPrompt);
+      expect(patch).not.toBeNull();
+      if (patch) Object.assign(target.config, patch);
+    }
+    expect(String(editor.config.positivePrompt)).toContain('主体位置');
   });
 
   it('用户手改过的提示词不会被分析自动覆盖', async () => {

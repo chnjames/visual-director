@@ -130,7 +130,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
       },
       { key: 'aspectRatio', label: '比例', dataType: 'aspect-ratio', defaultValue: '1:1', enumValues: ['1:1', '3:4', '4:3', '16:9', '9:16'], inline: false },
       { key: 'count', label: '数量', dataType: 'number', defaultValue: 1, min: 1, max: 4, inline: false },
-      { key: 'resolution', label: '分辨率', dataType: 'resolution', defaultValue: '2K', enumValues: ['2K', '3K'], inline: false },
+      { key: 'resolution', label: '分辨率', dataType: 'resolution', defaultValue: '1K', enumValues: ['1K', '2K', '3K'], inline: false },
       { key: 'referenceStrength', label: '参考强度', dataType: 'slider', defaultValue: 0.5, min: 0, max: 1, step: 0.05, inline: false, group: '高级' },
       { key: 'keepIdentity', label: '保持商品身份', dataType: 'switch', defaultValue: true, inline: false, group: '高级' },
       { key: 'resultImages', label: '生成结果', dataType: 'readonly-output', defaultValue: '', inline: false, group: '结果' },
@@ -448,7 +448,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     configFields: [
       { key: 'model', label: '图片模型', dataType: 'model-selector', defaultValue: 'default' },
       { key: 'aspectRatio', label: '比例', dataType: 'aspect-ratio', defaultValue: '1:1', enumValues: ['1:1', '3:4', '4:3', '16:9', '9:16'] },
-      { key: 'resolution', label: '分辨率', dataType: 'resolution', defaultValue: '2K', enumValues: ['2K', '3K'] },
+      { key: 'resolution', label: '分辨率', dataType: 'resolution', defaultValue: '1K', enumValues: ['1K', '2K', '3K'] },
       { key: 'count', label: '生成数量', dataType: 'number', defaultValue: 1, min: 1, max: 4 },
       { key: 'referenceStrength', label: '参考强度', dataType: 'slider', defaultValue: 0.5, min: 0, max: 1, step: 0.05 },
       { key: 'styleStrength', label: '风格强度', dataType: 'slider', defaultValue: 0.5, min: 0, max: 1, step: 0.05 },

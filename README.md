@@ -33,7 +33,7 @@ flowchart LR
 - **真实执行计划**：可执行节点通过内置适配器调用现有分析、生成、验收和修复能力，不使用模拟运行结果。
 - **批量复用**：批量任务绑定已发布版本，共享参考风格，并为每行商品提供独立输入与运行状态。
 - **本地素材与记录**：项目、草稿、版本、运行记录和素材保存在 IndexedDB。
-- **BYOK 安全模型**：API Key 仅保存在当前浏览器会话，通过同源代理调用火山方舟。
+- **BYOK 安全模型**：API Key 仅保存在当前浏览器会话；模型默认经 CORS 直连火山方舟，托管部署可切换为同源代理。
 
 ## 当前实现状态
 
@@ -59,6 +59,7 @@ flowchart LR
 | 数据校验 | Zod |
 | 本地存储 | IndexedDB、sessionStorage |
 | 测试 | Vitest、Testing Library、jsdom |
+| 托管部署 | Vercel Serverless（同源代理）|
 | 自部署服务 | Node.js 原生 HTTP Server |
 
 ## 快速开始
@@ -88,7 +89,7 @@ npm run build
 npm run serve
 ```
 
-`npm run build` 会执行 TypeScript 检查并生成 `dist/`；`npm run serve` 使用零依赖 Node.js 服务托管静态文件，同时提供 `/api/ark/chat` 和 `/api/ark/images` 同源代理。默认端口为 `5173`，可通过 `PORT` 环境变量修改。
+`npm run build` 会执行 TypeScript 检查并生成 `dist/`；`npm run serve` 使用零依赖 Node.js 服务托管静态文件，默认端口为 `5173`，可通过 `PORT` 环境变量修改。
 
 ```bash
 PORT=8080 npm run serve
@@ -100,6 +101,17 @@ Windows PowerShell：
 $env:PORT = 8080
 npm run serve
 ```
+
+### 部署模型与同源代理
+
+模型请求有两条传输路径，由构建期环境变量 `VITE_USE_SERVER_PROXY` 切换：
+
+| 路径 | 触发方式 | 行为 |
+| --- | --- | --- |
+| **浏览器直连（默认）** | 普通 `npm run build` / `npm run dev` | 浏览器通过 CORS 直接请求火山 Platform API；火山按 Origin 反射放行 |
+| **同源代理** | `VITE_USE_SERVER_PROXY=1 npm run build` | 模型请求改走同源端点 `/api/ark/chat`、`/api/ark/images` |
+
+仓库内置 Vercel 配置：`vercel.json` 已在构建命令中注入开关，`api/ark/chat.js`、`api/ark/images.js` 复用 `src/server/` 的代理处理器，推送到 Vercel 后自动生效。同源路径不依赖用户浏览器到火山接口的网络连通性，并在服务端做字段白名单与 SSRF 校验。
 
 ## 模型配置
 
@@ -148,8 +160,9 @@ npm run serve
 
 - **本地优先**：项目、草稿、工作流版本、运行记录、素材和批量数据存入浏览器 IndexedDB；不可用时退化为当前页面内存存储。
 - **密钥不落盘**：API Key 只保存在 `sessionStorage`，不进入 IndexedDB、localStorage、Cookie、URL 或导出文件。
-- **同源代理**：浏览器只请求本项目的代理端点；代理不会记录 API Key、完整请求头或模型请求体。
-- **SSRF 防护**：自定义 Base URL 必须为 HTTPS，并精确匹配火山官方域名边界。
+- **默认浏览器直连**：默认构建下浏览器经 CORS 直接请求火山接口，密钥只出现在发往火山官方域名的鉴权头中。
+- **可选同源代理**：开启 `VITE_USE_SERVER_PROXY` 后浏览器只请求本项目同源端点，密钥经 `x-ark-api-key` 头传递；代理不记录 API Key、完整请求头或模型请求体。
+- **SSRF 防护**：自定义 Base URL 必须为 HTTPS，并精确匹配火山官方域名边界（直连与代理路径均强制）。
 - **请求白名单**：代理只转发允许的字段；外部图片 URL、任意工具调用和未授权内容会被过滤。
 - **结构化校验**：模型输出经过 Zod Schema 校验，非法 JSON 或缺失字段会作为失败处理，不会伪装成功。
 - **封闭节点体系**：用户不能注入代码、Shell、任意 HTTP、文件系统或第三方节点包。
@@ -158,22 +171,24 @@ npm run serve
 
 ```text
 visual-director/
+├─ api/                     # Vercel Serverless 同源代理入口（chat / images）
 ├─ docs/                    # 产品、架构、数据、安全与验收文档
 ├─ scripts/                 # HTTP 冒烟检查脚本
-├─ server/                  # 生产静态服务器与火山方舟同源代理
+├─ server/                  # 自部署静态服务器（零依赖 Node.js）
 ├─ src/
 │  ├─ batch/                # 批量任务、预算、队列与执行策略
 │  ├─ components/           # 画布、节点、批量、Shell 与通用 UI
 │  ├─ data/                 # IndexedDB、项目、草稿、版本、运行和素材存储
 │  ├─ hooks/                # 工作流、批量任务与模型设置状态
-│  ├─ model/                # 火山方舟文本/视觉与图片生成客户端
+│  ├─ model/                # 火山客户端与传输层（直连 / 同源代理切换）
 │  ├─ pages/                # 项目、画布、批量、素材、记录和设置页面
 │  ├─ router/               # 零依赖 Hash Router
-│  ├─ server/               # 开发环境代理与安全过滤
+│  ├─ server/               # 同源代理处理器（Vercel / 自部署复用）
 │  ├─ shared/               # 公共类型、Schema、常量与安全工具
 │  └─ workflow/             # 图模型、校验、发布、执行计划与运行时
 ├─ .env.example
 ├─ package.json
+├─ vercel.json
 └─ vite.config.ts
 ```
 
@@ -187,26 +202,27 @@ flowchart TD
   Version --> Plan[ExecutionPlan]
   Plan --> Runtime[Graph Runtime]
   Runtime --> Adapters[内置节点适配器]
-  Adapters --> Proxy[同源安全代理]
-  Proxy --> Ark[火山方舟]
+  Adapters --> Transport{传输路径}
+  Transport -->|默认: CORS 直连| Ark[火山方舟]
+  Transport -->|Vercel: 同源代理| Proxy[Serverless 代理] --> Ark
   Draft --> IDB[(IndexedDB)]
   Version --> IDB
   Runtime --> IDB
 ```
 
-工作流只保存节点类型、配置和连接关系；网络请求能力由应用内置适配器提供。模型不能决定要访问的 URL、文件路径或节点类型。
+工作流只保存节点类型、配置和连接关系；网络请求能力由应用内置适配器提供。模型不能决定要访问的 URL、文件路径或节点类型。传输层（`src/model/transport.ts`）按构建环境在浏览器直连与同源代理之间切换。
 
 ## 常用命令
 
 | 命令 | 作用 |
 | --- | --- |
-| `npm run dev` | 启动 Vite 开发环境与开发代理 |
+| `npm run dev` | 启动 Vite 开发环境（默认浏览器直连） |
 | `npm run typecheck` | 执行 TypeScript 类型检查 |
 | `npm run test` | 运行 Vitest 自动化测试 |
 | `npm run test:watch` | 以监听模式运行测试 |
 | `npm run build` | 类型检查并生成生产构建 |
-| `npm run preview` | 预览静态构建产物，不包含生产代理 |
-| `npm run serve` | 托管 `dist/` 并启动同源模型代理 |
+| `npm run preview` | 预览静态构建产物 |
+| `npm run serve` | 零依赖托管 `dist/`（自部署） |
 
 构建并启动服务后，可运行 HTTP 冒烟检查：
 
@@ -236,7 +252,8 @@ node scripts/smoke-proxy.mjs http://localhost:5173
 - 工作流使用 DAG；当前不支持通用循环、子工作流和任意并行汇聚。
 - 规划中的节点可以编排和保存，但不能发布或运行。
 - 项目没有账号系统、云同步、协作编辑、支付或内置模型额度。
-- 当前代理只允许访问火山官方域名，不是通用多模型代理。
+- 默认浏览器直连依赖火山接口的 CORS 放行；若你的网络环境无法直连，请使用 Vercel 同源代理部署。
+- 同源代理只允许访问火山官方域名，不是通用多模型代理。
 - 图片和项目数据保存在当前浏览器；清除站点数据会移除本地项目。
 - 生产使用前仍应使用自己的有效接入点验证模型质量、费用和吞吐量。
 

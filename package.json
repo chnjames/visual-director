@@ -1,9 +1,9 @@
 {
-  "name": "visual-recipe-probe-station",
+  "name": "visual-director",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Visual Recipe 视觉配方工厂 - 阶段1 模型探针台（视觉配方 / 商品身份 / 结果验收）",
+  "description": "Visual Director - 本地优先、BYOK 的电商商品图 AI 工作流",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

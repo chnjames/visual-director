@@ -43,6 +43,7 @@ import type {
 } from '../shared/types';
 import type { ChatMessage } from './prompts';
 import { extractJson } from './parseJson';
+import { USE_SERVER_PROXY, fetchArkChatProxy, fetchArkImagesProxy } from './transport';
 
 type ProxySuccess = {
   ok: true;
@@ -106,6 +107,96 @@ function anthropicBlocks(parts: ChatMessage['content']): unknown[] {
   return blocks;
 }
 
+async function postToArkViaProxy(
+  settings: ModelSettings,
+  messages: ChatMessage[],
+  opts: { maxTokens?: number; jsonMode?: boolean; timeoutMs?: number },
+  controller: AbortController,
+  timer: ReturnType<typeof setTimeout>,
+  timeoutMs: number,
+  apiKey: string,
+  baseDiag: () => SafeDiagnostics,
+): Promise<
+  | { ok: true; status: number; body: ProxySuccess }
+  | { ok: false; status: number; error: SafeError }
+> {
+  let res: Response;
+  try {
+    res = await fetchArkChatProxy(
+      apiKey,
+      {
+        protocol: settings.protocol,
+        baseUrl: settings.baseUrl,
+        model: settings.seedEndpoint,
+        messages: messages as unknown[],
+        temperature: 0.2,
+        ...(opts.jsonMode === false ? {} : { response_format: { type: 'json_object' } }),
+        ...(opts.maxTokens !== undefined ? { max_tokens: opts.maxTokens } : {}),
+        timeoutMs,
+      },
+      controller.signal,
+    );
+  } catch (err) {
+    clearTimeout(timer);
+    const aborted = (err as Error)?.name === 'AbortError';
+    return {
+      ok: false,
+      status: 0,
+      error: createSafeError(
+        aborted ? 'timeout' : 'network',
+        aborted
+          ? `模型在 ${(timeoutMs / 1000).toFixed(0)} 秒内未返回。参考图分析较慢，可换更小的参考图、确认文本 Endpoint 可用后再试。`
+          : `无法连接同源代理：${redactSecret(describeNetworkFailure(err), apiKey)}`,
+        baseDiag(),
+        apiKey,
+      ),
+    };
+  }
+  clearTimeout(timer);
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    return {
+      ok: false,
+      status: res.status,
+      error: createSafeError(
+        'illegal-json',
+        `代理返回了无法解析的响应（HTTP ${res.status}）`,
+        baseDiag(),
+        apiKey,
+      ),
+    };
+  }
+
+  if (res.ok && (json as { ok?: boolean })?.ok === true) {
+    const j = json as { content: string; requestId?: string; diagnostics: SafeDiagnostics };
+    return {
+      ok: true,
+      status: res.status,
+      body: {
+        ok: true,
+        content: j.content,
+        requestId: j.requestId || undefined,
+        diagnostics: j.diagnostics ?? baseDiag(),
+      },
+    };
+  }
+
+  const safe = json as Partial<SafeError>;
+  return {
+    ok: false,
+    status: res.status,
+    error: {
+      ok: false,
+      errorClass: safe.errorClass ?? 'server',
+      message: safe.message ?? `代理请求失败（HTTP ${res.status}）`,
+      diagnostics: safe.diagnostics ?? baseDiag(),
+    },
+  };
+}
+
 async function postToArk(
   settings: ModelSettings,
   messages: ChatMessage[],
@@ -117,6 +208,7 @@ async function postToArk(
   const timeoutMs = Math.min(opts.timeoutMs ?? ARK_REQUEST_TIMEOUT_MS, ARK_MAX_TIMEOUT_MS);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   const targetUrl = buildArkUpstreamUrl(settings.protocol, settings.baseUrl);
   const baseDiag = () =>
     buildSafeDiagnostics({
@@ -127,6 +219,11 @@ async function postToArk(
     });
 
   const apiKey = textApiKeyOf(settings);
+
+  if (USE_SERVER_PROXY) {
+    return postToArkViaProxy(settings, messages, opts, controller, timer, timeoutMs, apiKey, baseDiag);
+}
+
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     accept: 'application/json',
@@ -399,6 +496,91 @@ export type ImageGenerateOptions = {
 };
 
 /**
+ * Vercel 同源函数路径：图片代理直接返回归一化结果
+ * （{ ok, b64Json, images, mediaType, diagnostics }），无需解析火山原生格式。
+ */
+async function generateImageViaProxy(
+  settings: ModelSettings,
+  prompt: string,
+  opts: ImageGenerateOptions,
+  controller: AbortController,
+  timer: ReturnType<typeof setTimeout>,
+  timeoutMs: number,
+  imageApiKey: string,
+): Promise<ImageGenerateResult> {
+  const referenceImages = (opts.productImages ?? [])
+    .map((image) => image.dataUri)
+    .filter((uri) => IMAGE_DATA_URI_RE.test(uri))
+    .slice(0, 10);
+  const diag = () =>
+    buildSafeDiagnostics({
+      model: settings.imageEndpoint,
+      endpointMasked: maskEndpoint(settings.imageEndpoint),
+      protocol: 'openai',
+    });
+
+  let res: Response;
+  try {
+    res = await fetchArkImagesProxy(
+      imageApiKey,
+      {
+        imageBaseUrl: settings.imageBaseUrl || ARK_IMAGE_DEFAULT_BASE_URL,
+        imageEndpoint: settings.imageEndpoint,
+        prompt,
+        images: referenceImages,
+        count: Math.min(4, Math.max(1, opts.count ?? 1)),
+        size: opts.size,
+        timeoutMs,
+      },
+      controller.signal,
+    );
+  } catch (err) {
+    clearTimeout(timer);
+    const aborted = (err as Error)?.name === 'AbortError';
+    return createSafeError(
+      aborted ? 'timeout' : 'network',
+      aborted
+        ? `图片生成超时（>${timeoutMs}ms）。2K/3K 或多张商品图较慢，可先减商品图数量或降到 1K 后重试。`
+        : `无法连接同源代理：${redactSecret(describeNetworkFailure(err), imageApiKey)}`,
+      diag(),
+      imageApiKey,
+    );
+  }
+  clearTimeout(timer);
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    return createSafeError('illegal-json', `代理返回了无法解析的响应（HTTP ${res.status}）`, diag(), imageApiKey);
+  }
+
+  if (res.ok && (json as { ok?: boolean })?.ok === true) {
+    const j = json as {
+      b64Json: string;
+      mediaType: string;
+      images?: Array<{ b64Json: string; mediaType: string }>;
+      diagnostics: SafeDiagnostics;
+    };
+    return {
+      ok: true,
+      b64Json: j.b64Json,
+      mediaType: j.mediaType ?? 'image/png',
+      images: j.images,
+      diagnostics: j.diagnostics ?? diag(),
+    };
+  }
+
+  const safe = json as Partial<SafeError>;
+  return {
+    ok: false,
+    errorClass: safe.errorClass ?? 'server',
+    message: safe.message ?? `代理请求失败（HTTP ${res.status}）`,
+    diagnostics: safe.diagnostics ?? diag(),
+  };
+}
+
+/**
  * 调用图片生成：直接 POST 到设置里的图片 Base URL + /images/generations。
  * Key 只放在 Authorization 头；只接受 b64_json，不跟随外部图片 URL。
  */
@@ -447,6 +629,9 @@ export async function generateImage(
   const timeoutMs = Math.min(opts.timeoutMs ?? ARK_IMAGE_TIMEOUT_MS, ARK_MAX_TIMEOUT_MS);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (USE_SERVER_PROXY) {
+    return generateImageViaProxy(settings, prompt, opts, controller, timer, timeoutMs, imageApiKey);
+  }
   const targetUrl = buildArkImageUrl(imageBaseUrl);
   const referenceImages = (opts.productImages ?? [])
     .map((image) => image.dataUri)

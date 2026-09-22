@@ -4,6 +4,7 @@ import { useModelSettings } from './hooks/useModelSettings';
 import { ModelSettingsModal } from './components/ModelSettingsModal';
 import { ProjectShell } from './components/shell/ProjectShell';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { LandingPage } from './pages/LandingPage';
 import { WorkflowEditorPage, type CanvasChrome } from './pages/WorkflowEditorPage';
 import { BatchPage } from './pages/BatchPage';
 import { AssetsPage } from './pages/AssetsPage';
@@ -58,6 +59,10 @@ function Root() {
     />
   );
   const openSettings = () => setModalOpen(true);
+
+  if (route.name === 'landing') {
+    return <LandingPage />;
+  }
 
   if (route.name === 'projects') {
     return (

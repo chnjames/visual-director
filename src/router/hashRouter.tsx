@@ -4,8 +4,8 @@
  * 不新增 react-router 依赖（符合“简单、可直接运行”的工程约束）。
  *
  * 路由：
- *   /                                     → 重定向 /projects
- *   /projects                             项目首页
+ *   /                                     产品官网首页（Landing，docs/16）
+ *   /projects                             项目首页（工作台）
  *   /projects/:id/canvas                  视觉工作台（项目默认页）
  *   /projects/:id/batch                   批量任务
  *   /projects/:id/assets                  素材库
@@ -16,6 +16,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 export type RouteName =
+  | 'landing'
   | 'projects'
   | 'canvas'
   | 'batch'
@@ -28,6 +29,7 @@ export type RouteName =
 export type ProjectSection = 'canvas' | 'batch' | 'assets' | 'runs' | 'settings';
 
 export type Route =
+  | { name: 'landing' }
   | { name: 'projects' }
   | { name: ProjectSection; projectId: string }
   | { name: 'settings-global' }
@@ -56,7 +58,7 @@ function parseHash(): { path: string; route: Route } {
     clean = '/';
   }
 
-  if (clean === '/' || clean === '') return { path, route: { name: 'projects' } };
+  if (clean === '/' || clean === '') return { path, route: { name: 'landing' } };
   if (clean === '/projects') return { path, route: { name: 'projects' } };
   if (clean === '/settings') return { path, route: { name: 'settings-global' } };
 
@@ -78,6 +80,8 @@ export function buildPath(
   const withSection = (base: string) =>
     params?.section ? `${base}?section=${encodeURIComponent(params.section)}` : base;
   switch (name) {
+    case 'landing':
+      return '/';
     case 'projects':
       return '/projects';
     case 'settings':
@@ -126,8 +130,8 @@ export function HashRouter({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onChange = () => setState(parseHash());
     window.addEventListener('hashchange', onChange);
-    // 首次进入 / 或空 hash 时规整到 /projects
-    if (!window.location.hash) window.location.hash = '/projects';
+    // 首次进入空 hash 时落到官网首页（/），由官网 CTA 进入 /projects
+    if (!window.location.hash) window.location.hash = '/';
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
 

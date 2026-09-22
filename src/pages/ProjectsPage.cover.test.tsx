@@ -7,7 +7,7 @@ import { upsertAsset } from '../data/assetStore';
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
-  window.location.hash = '';
+  window.location.hash = '/projects';
 });
 
 async function settle(times = 3) {

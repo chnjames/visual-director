@@ -5,7 +5,35 @@ import App from './App';
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
-  window.location.hash = '';
+  window.location.hash = '/projects';
+});
+
+describe('产品官网首页（#/）', () => {
+  beforeEach(() => {
+    window.location.hash = '';
+  });
+
+  it('空 hash 落到官网：完整可读，无 Key 也不崩溃', async () => {
+    render(<App />);
+    await settle();
+
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    // 所有“进入工作台”CTA 存在
+    expect(screen.getAllByRole('button', { name: /进入工作台/ }).length).toBeGreaterThan(0);
+    // 官网不渲染工作台的新建项目入口
+    expect(screen.queryByTestId('new-project')).toBeNull();
+  });
+
+  it('点击进入工作台直达项目首页', async () => {
+    render(<App />);
+    await settle();
+
+    fireEvent.click(screen.getAllByRole('button', { name: /进入工作台/ })[0]);
+    await settle();
+
+    expect(window.location.hash).toBe('#/projects');
+    expect(screen.getByTestId('new-project')).toBeInTheDocument();
+  });
 });
 
 async function settle() {
